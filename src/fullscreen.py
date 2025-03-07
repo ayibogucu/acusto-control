@@ -6,6 +6,7 @@ from pypylon import genicam, pylon
 import lib.cmr as cmr
 import lib.cnf as cnf
 import lib.mtr as mtr
+import lib.fcs as fcs
 
 
 def main():
@@ -41,6 +42,14 @@ def main():
                 print("Stage movement complete.")
             except Exception as e:
                 print(f"Error during stage movement: {e}")
+                continue
+
+            try:
+                print("Adjusting focus...")
+                fcs.move_to_focus(pidevice, camera, config)
+                print("Focus has been achieved.")
+            except Exception as e:
+                print(f"Error during focusing: {e}")
                 continue
 
             camera.StartGrabbingMax(1)

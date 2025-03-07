@@ -1,33 +1,67 @@
-from os.path import join
+from itertools import count
 
-import cv2
 import numpy as np
 from pipython import GCSDevice, pitools
 from pypylon import pylon
 
-from lib.cmr import save_images
+from lib.cmr import return_single_image
 from lib.cnf import Config
 
 
-def _capture_focus_range(
+class FocusMaximizer:
+    def __init__(self, patience=3):
+        self.best_score = None
+        self.best_index = None
+        self.current_index = 0
+        self.patience = patience
+        self.drop_counter = 0
+
+    def process_score(self, score):
+        if self.best_score is None:
+            self.best_score = score
+            self.best_index = self.current_index
+            self.current_index += 1
+            return (False, None, None)
+
+        if score > self.best_score:
+            self.best_score = score
+            self.best_index = self.current_index
+            self.drop_counter = 0
+        else:
+            if score < self.best_score:
+                self.drop_counter += 1
+
+        self.current_index += 1
+
+        if self.drop_counter >= self.patience:
+            return (True, self.best_index, self.best_score)
+        else:
+            return (False, None, None)
+
+
+def move_to_focus(
     pidevice: GCSDevice,
     camera: pylon.InstantCamera,
     config: Config,
-    frame_dir: str,
 ) -> float:
-    step_nums = np.arange(-config.movement.max_step_z, config.movement.max_step_z + 1)
-    current_z = pidevice.qPOS(config.axes.z)[config.axes.z]
-
-    for step_num in step_nums:
-        target_z = current_z + config.movement.dz * step_num
+    focus_maximizer = FocusMaximizer(patience=5)
+    for idx in count(0):
+        target_z = config.movement.min_z + config.movement.dz * idx
         pidevice.MOV(config.axes.z, target_z)
         pitools.waitontarget(pidevice, config.axes.z)
-        save_images(camera, 1, frame_dir, step_num)
+        img = return_single_image(camera)
+        score = _fft_focus_measure(img)
+        print(f"At index {idx}, FFT Focus Score: {score:.4f}")
 
-    pidevice.MOV(config.axes.z, current_z)
+        max_found, max_index, max_score = focus_maximizer.process_score(score)
+        if max_found:
+            print(f"Maximum detected at index {max_index} with score {max_score}")
+            break
+
+    best_target_z = config.movement.min_z + config.movement.dz * max_index
+    pidevice.MOV(config.axes.z, best_target_z)
     pitools.waitontarget(pidevice, config.axes.z)
-
-    return current_z
+    return best_target_z
 
 
 def _fft_focus_measure(gray, low_freq_radius_ratio=0.1):
@@ -49,32 +83,3 @@ def _fft_focus_measure(gray, low_freq_radius_ratio=0.1):
 
     ratio = high_freq_energy / total_energy
     return ratio
-
-
-def move_to_focus(
-    pidevice: GCSDevice,
-    camera: pylon.InstantCamera,
-    config: Config,
-    frame_dir: str,
-) -> None:
-    current_z = _capture_focus_range(pidevice, camera, config, frame_dir)
-    best_image_idx = 0
-
-    best_score = -np.inf
-    for idx in range(-config.movement.max_step_z, config.movement.max_step_z + 1, 1):
-        path = join(frame_dir, f"{idx}.tiff")
-        image = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-        if image is None:
-            print(f"Warning: Could not read image {path}. Skipping.")
-            continue
-
-        score = _fft_focus_measure(image)
-        print(f"Image: {path}, FFT Focus Score: {score:.4f}")
-
-        if score > best_score:
-            best_image_idx = idx
-
-    target_z = current_z + config.movement.dz * best_image_idx
-    pidevice.MOV(config.axes.z, target_z)
-    pitools.waitontarget(pidevice, config.axes.z)
-    print(f"Moved to z target value: {target_z}.")

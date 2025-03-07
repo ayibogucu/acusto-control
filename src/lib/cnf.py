@@ -38,7 +38,7 @@ class MovementConfig:
     dx: float
     dy: float
     dz: float
-    max_step_z: int
+    min_z: float
     num_steps_x: int
     num_steps_y: int
 
