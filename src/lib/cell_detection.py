@@ -9,7 +9,7 @@ def get_bounding_boxes(
 ) -> Optional[np.ndarray]:
     img = imread(img_path)
     results = model(img)
-    bboxes = results[0].boxes.xyxy[:, :4]
+    bboxes = results[0].boxes.xyxy
 
     if bboxes.shape[0] == 0:
         return None

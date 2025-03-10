@@ -74,6 +74,14 @@ def main():
                 print(f"Error during stage movement: {e}")
                 continue
 
+            try:
+                print("Adjusting focus...")
+                fcs.move_to_focus(pidevice, camera, config)
+                print("Focus has been achieved.")
+            except Exception as e:
+                print(f"Error during focusing: {e}")
+                continue
+
             print("Capturing original image...")
             temp_dir = os.path.join(config.file.save_dir, "temp")
             try:
@@ -136,9 +144,13 @@ def main():
                         f"OffsetX={camera.OffsetX.Value}, OffsetY={camera.OffsetY.Value}"
                     )
 
-                    print("Performing autofocus...")
-                    focus_dir = os.path.join(temp_dir, "focus")
-                    fcs.move_to_focus(pidevice, camera, config, focus_dir)
+                    try:
+                        print("Adjusting focus...")
+                        fcs.move_to_focus(pidevice, camera, config)
+                        print("Focus has been achieved.")
+                    except Exception as e:
+                        print(f"Error during focusing: {e}")
+                        continue
 
                     print("Starting image capture...")
                     cmr.save_images(camera, config.camera.num_of_images, frame_dir)
