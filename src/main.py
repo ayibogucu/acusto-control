@@ -12,6 +12,11 @@ from lib.cell_detection import get_bounding_boxes
 import lib.fcs as fcs
 
 
+# TODO: histogram/roi auto exposure
+# TODO: autofocus algorithm based on https://opg.optica.org/oe/fulltext.cfm?uri=oe-29-7-10285&id=449327
+# TODO: cell yolo model
+
+
 def main():
     print("Loading configuration...")
     config = cnf.load_config("config.toml")
@@ -72,14 +77,6 @@ def main():
                 print("Stage movement complete.")
             except Exception as e:
                 print(f"Error during stage movement: {e}")
-                continue
-
-            try:
-                print("Adjusting focus...")
-                fcs.move_to_focus(pidevice, camera, config)
-                print("Focus has been achieved.")
-            except Exception as e:
-                print(f"Error during focusing: {e}")
                 continue
 
             print("Capturing original image...")
